@@ -221,6 +221,18 @@ def test_walking_on_green_out_earns_standing_still(flock, walker_step, speed):
     assert paid[False] - paid[True] > 1.6
 
 
+def test_progress_pays_the_speed_along_the_lane_not_along_the_nose():
+    def paid(heading_deg, speed, command):
+        h = math.radians(heading_deg)
+        data = SimpleNamespace(root_link_lin_vel_w=torch.tensor([[speed * math.cos(h), speed * math.sin(h), 0.0]]))
+        stub = SimpleNamespace(scene={"robot": SimpleNamespace(data=data)},
+                               command_manager=SimpleNamespace(get_command={"twist": torch.tensor([[command, 0.0, 0.0]])}.get))
+        return rewards.progress(stub, "twist").item()
+    assert paid(0, 1.0, 1.5) == pytest.approx(1.0) and paid(0, 1.0, 0.6) == pytest.approx(0.6)   # min(speed, command)
+    assert paid(45, 1.0, 1.5) == pytest.approx(math.cos(math.radians(45)))
+    assert paid(90, 1.0, 1.5) == pytest.approx(0.0, abs=1e-6) and paid(180, 1.0, 1.5) == 0.0
+
+
 def test_freeze_pays_only_while_watched_and_fades_at_the_tolerance(cfg):
     fake = lambda watch, drift: SimpleNamespace(command_manager=SimpleNamespace(get_term=lambda name: SimpleNamespace(
         stepped=lambda: (None, None, torch.tensor(watch)), drift=lambda: torch.tensor(drift))))
