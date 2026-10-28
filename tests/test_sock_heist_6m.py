@@ -12,9 +12,11 @@ from tensordict import TensorDict
 from arena import runner as arena_runner
 from arena.assets import ASSET_ROOT
 from arena.constants import ACTION_SCALE, CTRL_DT as ARENA_CTRL_DT, OBS_SIZE
-from arena.lights import timetable
+from arena.constants import TRACE_WIDTH
+from arena.lights import Red, timetable
 from arena.manifest import load_event
-from microduck_challenges.sock_heist_6m import env, lights, rewards, walker
+from arena.runner import RunOutcome
+from microduck_challenges.sock_heist_6m import check, env, lights, rewards, walker
 from microduck_challenges.tug_of_war.opponent import load_actor
 
 EVENT = load_event("sock-heist-6m")
@@ -298,3 +300,48 @@ def test_the_walker_walks_in_the_training_env(live, walker_step):
 def test_the_recipe_judges_every_hundred_iterations():
     recipe = tomllib.loads((FOLDER / "challenge.toml").read_text())["recipe"]
     assert recipe == {"num_envs": 4096, "max_iterations": 1000, "seed": 1} and env.RL_CFG.save_interval == 100
+
+
+def _outcome(status, x, caught_frame=None, time_s=None):
+    """A run whose trace is zeros but its x column, after a one-frame settle at x 0."""
+    trace = np.zeros((len(x), TRACE_WIDTH), dtype=np.float32)
+    trace[:, 0] = x
+    return RunOutcome(1, status, time_s, 0.0, 0.0, trace, np.zeros((1, TRACE_WIDTH), dtype=np.float32), caught_frame)
+
+
+def test_a_catch_says_how_far_into_the_watch_and_how_fast_the_duck_came():
+    x = np.minimum(np.arange(140) * 0.01, 0.72)            # 0.5 m/s, then still from step 72
+    kind, line = check.judge(_outcome("caught", x, caught_frame=72), (Red(50, 70),), 20, 15)
+    assert kind == "caught early"
+    assert line.startswith("caught at 1.46 s, 0.04 s into the watch, 0.50 m/s as the red began · 1 red met")
+
+
+def test_a_fall_tipping_in_a_reds_first_moments_is_on_a_stop():
+    kind, line = check.judge(_outcome("fall", np.zeros(75)), (Red(50, 70),), 20, 15)
+    assert (kind, line.split(" · ")[0]) == ("fell on a stop", "fell at 1.50 s on a stop, tipping 0.20 s after a red began")
+
+
+def test_a_fall_far_from_any_red_is_on_green():
+    assert check.judge(_outcome("fall", np.zeros(75)), (Red(200, 70),), 20, 15)[0] == "fell on green"
+
+
+def test_a_duck_that_never_left_the_line_is_named():
+    kind, line = check.judge(_outcome("timeout", np.full(500, 0.1)), (Red(50, 70),), 20, 15)
+    assert (kind, line.split(" · ")[0]) == ("never left the line", "never left the line (0.10 m)")
+
+
+def test_the_worst_drift_is_read_over_the_watched_steps():
+    x = np.zeros(200); x[69:] = 0.05; x[75] = 0.07          # marked at 69 (0.05 m), 2 cm off at 75
+    assert "worst drift 2.0 cm" in check.judge(_outcome("finish", x, time_s=4.0), (Red(50, 70),), 20, 15)[1]
+
+
+def test_the_tally_counts_each_kind():
+    kinds = ["finish", "caught early", "fell on a stop", "finish", "never left the line"]
+    assert check.tally(kinds, [10.0, 30.0, 30.0, 12.0, 30.0]) == (
+        "finished 2/5 · caught 1 (early 1) · fell 1 (on a stop 1, on a start 0) · out of time 1 (never left the line 1) · mean 22.40 s")
+
+
+def test_check_judges_the_walker(capsys):
+    assert check.main([str(walker.WALKER), "--speed", "0.95", "--seeds", "1"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("seed 1 · ") and lines[-1].startswith("finished ")   # no verdict: platforms differ
