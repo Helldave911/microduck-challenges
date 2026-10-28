@@ -90,7 +90,7 @@ walks on its command is all the challenge asks.
 | Knob | Label | Default | Range | Sets in `env.py` |
 |---|---|---|---|---|
 | `forward_reward` | Walk on green | 2.0 | 0.5–5.0 | `track_linear_velocity` weight |
-| `progress_reward` | Walk forward | 8.0 | 0.0–16.0 | `progress` weight |
+| `progress_reward` | Walk forward | 12.0 | 0.0–16.0 | `progress` weight |
 | `freeze_reward` | Freeze while watched | 2.0 | 0.0–6.0 | `freeze` weight |
 | `upright_reward` | Stay upright | 2.0 | 0.5–5.0 | `upright` weight |
 | `step_reward` | Lift your feet | 3.0 | 0.0–6.0 | `air_time` weight |
@@ -101,7 +101,7 @@ The reward terms as they start:
 |---|---|---|
 | `track_linear_velocity` | `forward_reward` 2.0, std √0.1 | Progress on green at the commanded speed, and stillness on red (a zero command). At 0.45 m/s standing earns 13 % of walking; the Tug of War's t4/t5 never walked at 41 %. |
 | `track_angular_velocity` | 2.0, std √0.5 | The lane's hold steers through the yaw rate, so tracking it is the steering. |
-| `progress` | `progress_reward` 8.0 | Forward speed up to the command, nothing on red. Without it a statue out-earned the walker under the lights (8.92 a step against 7.91): the walker reaches only ~0.45 of its command, which `track_linear_velocity` barely pays over standing, and heist1 and heist2 learned to creep. |
+| `progress` | `progress_reward` 12.0 | Forward speed up to the command, nothing on red. Without it a statue out-earned the walker under the lights (8.92 a step against 7.91): the walker reaches only ~0.45 of its command, which `track_linear_velocity` barely pays over standing, and heist1 and heist2 learned to creep. |
 | `freeze` | `freeze_reward` 2.0, std 0.03 m | The rule is 3 cm, and nothing else sees a few centimetres of creep: tracking's std is 0.32 m/s. |
 | `upright` | `upright_reward` 2.0, std √0.05 | The sprint's. A forward lean is what ends in a fall on a stop. |
 | `air_time` | `step_reward` 3.0, threshold 0.01 | The sprint's. It pays steps only on a non-zero command, so stepping in place under a red earns nothing (on green it pays stepping in place too; `progress` pays walking over it). |
