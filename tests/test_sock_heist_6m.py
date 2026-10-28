@@ -80,11 +80,15 @@ def cfg():
     return env.make_env_cfg()
 
 
+SEED = 0  # the live env's randomisation, drawn the same on every run: TESTS gates every training
+
+
 @pytest.fixture(scope="module")
 def live():
-    """The training env, 2 envs on the CPU."""
+    """The training env, 2 envs on the CPU, seeded."""
     cfg = env.make_env_cfg()
     cfg.scene.num_envs = 2
+    cfg.seed = SEED
     training = ManagerBasedRlEnv(cfg, device="cpu")
     training.reset()
     yield training
@@ -105,8 +109,9 @@ def walker_step():
 
 
 def _set_reds(live, onset, length):
-    """A fresh episode in both envs, each with one red: `length` steps from step `onset`."""
-    live.reset()
+    """A fresh episode in both envs, each with one red: `length` steps from step `onset`. Reseeded, so a
+    test's randomisation is the same whichever tests ran before it."""
+    live.reset(seed=SEED)
     term = live.command_manager.get_term("twist")
     term.onset[:, 0] = onset
     term.onset[:, 1:] = 10**6
@@ -226,6 +231,17 @@ def test_moving_past_the_tolerance_while_watched_is_caught(live, walker_step):
         assert live.termination_manager.get_term("caught").tolist() == ([True, False] if k == 65 else [False, False])
 
 
+def test_a_duck_entering_mid_watch_is_judged_from_where_it_entered(live):
+    """mjlab's train starts rsl_rl's learn at random episode lengths (init_at_random_ep_len): every env is moved
+    to a random step after the wrapper's reset, without another, so some start inside a watch, past its mark."""
+    term = live.command_manager.get_term("twist")
+    _set_reds(live, onset=40, length=40)                 # watched 60-79
+    live.episode_length_buf = torch.full_like(live.episode_length_buf, 65)    # a new tensor, as learn() assigns it
+    assert term.ahead()[1].all()                         # the step about to run is watched
+    live.step(torch.zeros(2, 14))
+    assert live.termination_manager.get_term("caught").tolist() == [False, False]
+
+
 def test_the_critic_is_told_the_light_and_the_lane(live, walker_step):
     term = live.command_manager.get_term("twist")
     _set_reds(live, onset=40, length=30)                 # turning 40-59, watched 60-69
@@ -276,7 +292,7 @@ def test_the_walker_walks_in_the_training_env(live, walker_step):
         assert not live.reset_terminated.any()
     # 2.5 s of green: #3 measured ~0.3 m/s at 0.6. Randomised, 64 envs made 0.37 to 0.74 m (median 0.65);
     # one standing on its line makes millimetres.
-    assert (_qpos(live)[:, 0] - x0 > 0.2).all()
+    assert (_qpos(live)[:, 0] - x0 > 0.3).all()
 
 
 def test_the_recipe_judges_every_hundred_iterations():

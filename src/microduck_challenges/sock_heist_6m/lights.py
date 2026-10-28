@@ -75,7 +75,10 @@ class LightsCommand(microduck_mdp.VelocityCommandCommandOnly):
     red, from its first step to its last, and on green `[speed, 0, hold]`, the hold turning the duck
     toward its lane. Each episode draws one forward speed (the base draw, over the sweep) and its reds
     (draw_reds). The lane runs along +x through the spawn point, as the Arena's runs along its x axis
-    from y = 0. The mark is where the trunk stands on the floor once the head has finished turning.
+    from y = 0. The mark is where the trunk stands on the floor once the head has finished turning,
+    and where it entered the episode until then: mjlab's train starts rsl_rl's learn at random episode
+    lengths, moving every env to a random step after its first reset without another, so an env may
+    start inside a watch, past its mark step.
 
     mjlab calls _update_command after a step's physics, terminations, rewards and resets: `stepped()`
     is the step just simulated, and the twist is for the step about to run.
@@ -115,10 +118,10 @@ class LightsCommand(microduck_mdp.VelocityCommandCommandOnly):
         self.onset[env_ids], self.length[env_ids] = draw_reds(len(env_ids), self._env.max_episode_length, self.device)
 
     def _update_command(self) -> None:
-        trunk = self.trunk
+        trunk, fresh = self.trunk, self._env.episode_length_buf == 0
         _, mark, _ = self.stepped()
-        self.mark[:] = torch.where(mark[:, None], trunk[:, 0:2], self.mark)
-        self.lane_y[:] = torch.where(self._env.episode_length_buf == 0, trunk[:, 1], self.lane_y)
+        self.mark[:] = torch.where((mark | fresh)[:, None], trunk[:, 0:2], self.mark)
+        self.lane_y[:] = torch.where(fresh, trunk[:, 1], self.lane_y)
         standing, _ = self.ahead()
         hold = hold_yaw_rate(trunk[:, 1] - self.lane_y, trunk[:, 3:7])
         walk = torch.stack([self.speed, torch.zeros_like(hold), hold], dim=-1)
