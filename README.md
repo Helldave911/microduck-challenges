@@ -10,6 +10,7 @@ working training environment: train it unchanged and the robot competes.
 | hill_climb_1m5 | hill-climb-1m5 | Mjlab-HillClimb1m5-MicroDuck |
 | roller_sprint_2m | roller-sprint-2m | Mjlab-RollerSprint2m-MicroDuck |
 | tug_of_war | tug-of-war | Mjlab-TugOfWar-MicroDuck |
+| sock_heist_6m | sock-heist-6m | Mjlab-SockHeist6m-MicroDuck |
 
 Training with a coding agent (Claude Code, Codex, Cursor…)? Each challenge folder has an
 `AGENTS.md` that tells it which files to change, how to run and judge a training, and the

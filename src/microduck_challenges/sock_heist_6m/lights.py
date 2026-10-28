@@ -1,4 +1,5 @@
-"""The Sock Heist's rules for training: the event's numbers and the Arena's arithmetic, copied.
+"""The Sock Heist's rules for training: the event's numbers and the Arena's arithmetic, copied, and
+LightsCommand, the twist that plays them to the policy.
 
 The training job installs no Arena, so nothing here is imported from it;
 tests/test_sock_heist_6m.py pins each copy against it.
@@ -6,6 +7,7 @@ tests/test_sock_heist_6m.py pins each copy against it.
 import math
 
 import torch
+from mjlab_microduck.tasks import mdp as microduck_mdp
 
 CTRL_DT = 0.02                 # arena.constants
 SETTLE_S = 0.5                 # [start] settle_s
@@ -48,10 +50,76 @@ def light_steps(onset: torch.Tensor, length: torch.Tensor, turn: int, k: torch.T
     return red.any(1), mark.any(1), watch.any(1)
 
 
+def yaw_of(quat: torch.Tensor) -> torch.Tensor:
+    """(n,): the yaw of the trunk's wxyz quaternion (n, 4), tilted or not, as arena.runner._steered reads it."""
+    w, qx, qy, qz = quat.unbind(-1)
+    return torch.atan2(2.0 * (w * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
+
+
 def hold_yaw_rate(y: torch.Tensor, quat: torch.Tensor) -> torch.Tensor:
     """The yaw rate that turns the duck toward the lane's centre line `LOOKAHEAD_M` ahead (arena.runner._steered).
     `y` is the offset from the lane (n,), `quat` the trunk's wxyz (n, 4)."""
-    w, qx, qy, qz = quat.unbind(-1)
-    yaw = torch.atan2(2.0 * (w * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
-    error = torch.remainder(torch.atan2(-y, torch.full_like(y, LOOKAHEAD_M)) - yaw + math.pi, 2.0 * math.pi) - math.pi
+    error = torch.remainder(torch.atan2(-y, torch.full_like(y, LOOKAHEAD_M)) - yaw_of(quat) + math.pi, 2.0 * math.pi) - math.pi
     return torch.clamp(GAIN * error, -MAX_YAW_RATE, MAX_YAW_RATE)
+
+
+class LightsCommandCfg(microduck_mdp.VelocityCommandCommandOnlyCfg):
+    """The twist under the giant's eye: LightsCommand."""
+
+    def build(self, env) -> "LightsCommand":
+        return LightsCommand(self, env)
+
+
+class LightsCommand(microduck_mdp.VelocityCommandCommandOnly):
+    """The twist the policy reads, as arena.runner.run_once asks it: zeros through the settle and every
+    red, from its first step to its last, and on green `[speed, 0, hold]`, the hold turning the duck
+    toward its lane. Each episode draws one forward speed (the base draw, over the sweep) and its reds
+    (draw_reds). The lane runs along +x through the spawn point, as the Arena's runs along its x axis
+    from y = 0. The mark is where the trunk stands on the floor once the head has finished turning.
+
+    mjlab calls _update_command after a step's physics, terminations, rewards and resets: `stepped()`
+    is the step just simulated, and the twist is for the step about to run.
+    """
+
+    turn: int = steps(TURN_S)
+
+    def __init__(self, cfg: LightsCommandCfg, env):
+        super().__init__(cfg, env)
+        self.speed = torch.zeros(self.num_envs, device=self.device)
+        self.onset, self.length = draw_reds(self.num_envs, env.max_episode_length, self.device)
+        self.lane_y = torch.zeros(self.num_envs, device=self.device)
+        self.mark = torch.zeros(self.num_envs, 2, device=self.device)
+
+    @property
+    def trunk(self) -> torch.Tensor:
+        """(n, 7): the trunk's free-joint qpos, its position then its wxyz quaternion, as run_once reads it."""
+        return self.robot.data.data.qpos[:, self.robot.indexing.free_joint_q_adr]
+
+    def stepped(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """(red, mark, watch) at the step just simulated."""
+        return light_steps(self.onset, self.length, self.turn, self._env.episode_length_buf - 1)
+
+    def ahead(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """(standing, watch) at the step about to run: standing through the settle and every red."""
+        k = self._env.episode_length_buf
+        red, _, watch = light_steps(self.onset, self.length, self.turn, k)
+        return (k < steps(SETTLE_S)) | red, watch
+
+    def drift(self) -> torch.Tensor:
+        """(n,): how far the trunk stands across the floor from its mark, in m."""
+        return torch.linalg.vector_norm(self.trunk[:, 0:2] - self.mark, dim=-1)
+
+    def _resample_command(self, env_ids: torch.Tensor) -> None:
+        super()._resample_command(env_ids)
+        self.speed[env_ids] = self.vel_command_b[env_ids, 0]
+        self.onset[env_ids], self.length[env_ids] = draw_reds(len(env_ids), self._env.max_episode_length, self.device)
+
+    def _update_command(self) -> None:
+        trunk = self.trunk
+        _, mark, _ = self.stepped()
+        self.mark[:] = torch.where(mark[:, None], trunk[:, 0:2], self.mark)
+        self.lane_y[:] = torch.where(self._env.episode_length_buf == 0, trunk[:, 1], self.lane_y)
+        standing, _ = self.ahead()
+        hold = hold_yaw_rate(trunk[:, 1] - self.lane_y, trunk[:, 3:7])
+        walk = torch.stack([self.speed, torch.zeros_like(hold), hold], dim=-1)
+        self.vel_command_b[:] = torch.where(standing[:, None], 0.0, walk)
