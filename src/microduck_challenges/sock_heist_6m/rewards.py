@@ -15,10 +15,8 @@ def freeze(env, command_name: str, std: float) -> torch.Tensor:
 
 
 def progress(env, command_name: str) -> torch.Tensor:
-    """Speed along the lane (world +x, where it runs from the spawn line), up to the command: pays walking on
-    green and nothing on red (the command is zero). The body's own forward speed paid a veer as much as a
-    straight walk, so a policy could trade steering for speed; along the lane a heading 45° off earns cos 45°."""
-    vx = env.scene["robot"].data.root_link_lin_vel_w[:, 0].clamp(min=0.0)
+    """Forward speed, up to the command: pays walking on green and nothing on red (the command is zero)."""
+    vx = env.scene["robot"].data.root_link_lin_vel_b[:, 0].clamp(min=0.0)
     return torch.minimum(vx, env.command_manager.get_command(command_name)[:, 0])
 
 
