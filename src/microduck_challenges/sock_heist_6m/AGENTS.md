@@ -36,7 +36,7 @@ The rules, from `arena/events/sock-heist-6m.toml` in the installed Arena:
 - **Sweep**: every `vx` from 0.20 to 1.20 m/s in 0.05 steps is tried once (seed 1); the 3 fastest
   are re-run on seeds 1–5; the score is the best mean time over those 5 seeds.
 - **Fall**: trunk tilted more than 60° (gravity z above −0.5) for 0.3 s. A fall, a catch, or no
-  finish within the **60 s** time limit (`time_limit_s`) counts 60 s. **Finish 5/5 first, then get
+  finish within the **40 s** time limit (`time_limit_s`) counts 40 s. **Finish 5/5 first, then get
   faster.**
 
 ## The policy
@@ -104,7 +104,7 @@ The reward terms as they start:
 |---|---|---|
 | `track_linear_velocity` | `forward_reward` 2.0, std √0.1 | Progress on green at the commanded speed, and stillness on red (a zero command). At 0.45 m/s standing earns 13 % of walking; the Tug of War's t4/t5 never walked at 41 %. |
 | `track_angular_velocity` | 2.0, std √0.5 | The lane's hold steers through the yaw rate, so tracking it is the steering. |
-| `progress` | `progress_reward` 8.0 | Speed along the lane (world +x, not the duck's own nose: a veer pays less) up to the command, nothing on red. Without it a statue out-earned the walker under the lights (8.92 a step against 7.91): the walker reaches only ~0.45 of its command, which `track_linear_velocity` barely pays over standing, and heist1 and heist2 learned to creep. |
+| `progress` | `progress_reward` 8.0 | Forward speed along the duck's own nose, up to the command, nothing on red. Without it a statue out-earned the walker under the lights (8.92 a step against 7.91): the walker reaches only ~0.45 of its command, which `track_linear_velocity` barely pays over standing, and heist1 and heist2 learned to creep. |
 | `freeze` | `freeze_reward` 2.0, std 0.03 m | The rule is 3 cm, and nothing else sees a few centimetres of creep: tracking's std is 0.32 m/s. |
 | `upright` | `upright_reward` 2.0, std √0.05 | The sprint's. A forward lean is what ends in a fall on a stop. |
 | `air_time` | `step_reward` 3.0, threshold 0.01 | The sprint's. It pays steps only on a non-zero command, so stepping in place under a red earns nothing (on green it pays stepping in place too; `progress` pays walking over it). |
@@ -202,11 +202,12 @@ Agree with the user before the first run:
   " logs/rsl_rl/sock_heist_6m/<run> Train/mean_episode_length Episode_Termination/caught Episode_Termination/fell_over Episode_Reward/freeze Episode_Reward/track_linear_velocity
   ```
 
-  No run of this recipe has been measured yet. What to look for: `Train/mean_episode_length` toward
-  1000 (a full 20 s episode), `caught` and `fell_over` falling. A warning sign: `freeze` rising while
-  `track_linear_velocity` falls, a duck learning to stand everywhere, which is never caught for it;
-  so are `nan_state` terminations. A run that has collapsed and not recovered within a few
-  checkpoints: tell the user and propose stopping it.
+  What to look for: `Train/mean_episode_length` toward 1000 (a full 20 s episode), `caught` and
+  `fell_over` falling. A warning sign: `freeze` rising while `track_linear_velocity` falls, a duck
+  learning to stand everywhere, which is never caught for it; so are `nan_state` terminations, and
+  `Episode_Termination/off_lane` rising. The curves alone fooled the first four runs (episodes at the
+  cap, nothing caught, yet a creeping or veering duck on the Arena): judge the checkpoints. A run
+  that has collapsed and not recovered within a few checkpoints: tell the user and propose stopping it.
 
 ### Judging every checkpoint
 
@@ -234,8 +235,25 @@ over seeds 1 to 5 (or `--seeds N`):
 uv run --frozen --group workshop python -m microduck_challenges.sock_heist_6m.check publish-eval/policy.onnx
 ```
 
-It prints a line per seed (finished, caught, fell, or out of time, with the reds met, the worst
-drift from a mark and the speed on green), then the tally.
+It prints `scored at V m/s` (the speed the Arena scores it at), a line per seed, then the tally:
+
+```
+seed 2 · finish 18.80 s · 5 reds met · worst drift 0.6 cm · 0.66 m/s on green
+finished 25/25 · caught 0 (early 0) · fell 0 (on a stop 0, on a start 0) · out of time 0 (never left the line 0) · mean 17.17 s
+```
+
+- **`seed 2 · finish 18.80 s`**: the seed and how it ended, with its time. The other endings:
+  `caught at 1.56 s, 0.46 s into the watch, 0.49 m/s as the red began` (the time, how long after the
+  head finished turning, and the speed as the red began: `caught early` within 0.2 s of the watch's
+  start, still moving, `caught late` after, creeping); `fell at 3.20 s on a stop, tipping 0.30 s after
+  a red began` (or `on a start`, within 0.6 s of a red ending, or `on green`, or `under a red`);
+  `out of time at 2.10 m`; `never left the line (0.12 m)` (ended less than 0.5 m from the line).
+- **`5 reds met`**: the reds that began before the seed ended.
+- **`worst drift 0.6 cm`**: the largest distance from a mark while watched, the tolerance being 3 cm.
+- **`0.66 m/s on green`**: the mean speed along the lane over the green steps.
+- **The tally**: `finished` seeds out of those replayed; `caught` (of which `early`); `fell` (of which
+  on a stop and on a start); `out of time` (of which `never left the line`); `mean`, over all the
+  seeds, an unfinished one counted at the time limit.
 
 Pick by score: 5/5 finishes first, then the lowest time. The best checkpoint is often not the last.
 Scores on this machine are indicative: only the Space times an entry, and simulations on different
@@ -270,12 +288,86 @@ fork, never `pollen-robotics`; the workshop's home sets that up).
 
 ## What is known about this challenge
 
-From the reference walker on this 6 m lane, measured on a Mac (indicative: the Arena's x86 physics
-decides):
+Every number below was measured on a Mac (indicative), except those marked x86, which an
+Hugging Face Job timed on the Space's image: the Arena's x86 physics decides.
 
-- **It was never trained to stop and start again.**
-- **The sweep**: it finishes from 0.40 to 1.00 m/s (24.21 s at 1.00 m/s, its scored command, 5/5
-  seeds between 22.6 s and 25.1 s); from 1.05 m/s it falls or is caught.
+### The reference walker
+
+It was never trained to stop and start again.
+
+| | Mac | x86 |
+|---|---|---|
+| Score | 24.21 s at 1.00 m/s, 5/5 (seeds 25.14, 24.21, 24.39, 22.57, 24.75) | 24.16 s at 1.00 m/s, 5/5 |
+
+- **The sweep**: it finishes from 0.40 to 1.00 m/s; from 1.05 m/s it falls or is caught.
 - **Replayed at 1.00 m/s over 25 seeds, it finishes 24** with a mean finish of 24.01 s (21.42 s to
   26.57 s), **and is caught once** (seed 23, 0.46 s into the watch, at 1.56 s). None fell and none
   stayed at the start; the worst drift while watched is 3.0 cm (2.7 cm among the finishers).
+
+### The six trainings
+
+Each started as the walker, 4096 envs, 1000 iterations, seed 1 (heist2: seed 2), on an `l4x1` job;
+one change each, all judged on every checkpoint (100 to 900, and 999). Best checkpoint, its Mac
+score and finishes, and its CHECK tally over 25 seeds:
+
+| Run | Commit | What it changed | Best | Mac score | CHECK 25 seeds |
+|---|---|---|---|---|---|
+| heist1, heist2 | 29dfda3 | The recipe as first committed | 100 each | heist1: none finishes (0/5, out of 60 s); heist2: 57.80 s 5/5 | heist1: 0/25 out of time (0.12 m/s on green); heist2: 20/25 out of time 5 (0.19 m/s) |
+| heist3 | 69c387f | `progress` at weight 8 | 200 | 29.97 s 5/5 at 0.20 m/s | 22/25: caught 2, fell 1 |
+| heist4 | 96960f7 | `progress` at weight 12 | 100 | 45.69 s 3/5 | 17/25: caught 2, fell 4, out of time 2 |
+| **heist5** | **2efb9e1** | `progress` at weight 8 and the `off_lane` termination | **300** | **16.98 s 5/5 at 1.20 m/s** | **25/25** |
+| heist6 | dff30d8 | heist5, `progress` along the lane | none | canceled once heist5-300 passed, unjudged | |
+
+What each run showed:
+
+- **heist1 and heist2 crept.** The training curves looked healthy (episodes at the 1000-step cap,
+  nothing caught, nothing fallen), yet on the Arena the policy crept at 0.03 to 0.19 m/s on green and
+  crept slower checkpoint after checkpoint. The reward made standing optimal: a statue earned 8.92 a
+  step, the walker 7.91, a duck that walks on green and freezes on red 8.29, because the walker
+  reaches only about 0.45 of its command, which `track_linear_velocity` barely pays over standing.
+  A heavier forward reward would not have fixed it. `progress` did: measured on the training
+  environment, walking now beats standing by 2.0 a step at 0.8 and 1.0 m/s.
+- **heist3 and heist4 walked, then ignored the turn command.** Walking paid, but `progress` pays
+  speed along the nose whatever the heading, and the training floor has no walls, so veering was
+  free. From checkpoint 200 on the policy ignored its yaw-rate command and veered right (off a 0.3 m
+  half-lane on 83 % of timed steps in training): the Arena's wall caught or felled it within about a
+  second (heist3-999: 0/25 on the Arena, 0 caught and 0 fell in training). Weight 12 was worse than 8:
+  both collapsed near iteration 300 (caught peaked near 5 per step) and recovered by 600 in the
+  curves, but not on the Arena.
+- **heist5's `off_lane` termination worked.** It ends an episode whose trunk strays more than 0.3 m
+  from its lane, as the Arena's wall would. Steering stopped being free: the policy follows its turn
+  command again (at 0.75 m/s, commands -1 / -0.5 / 0 / +0.5 / +1 walked -0.76 / -0.26 / +0.18 / +0.55
+  / +0.80 rad/s at checkpoint 300) and the first three checkpoints all beat the walker.
+- **Checkpoints differ**; judge each. heist5: 100, 200 and 300 all finish 5/5 and pass CHECK 25/25
+  (Mac 23.03 s at 1.20 m/s, 19.34 s at 0.95, 16.98 s at 1.20; 0.48, 0.58 and 0.66 m/s on green),
+  each faster than the last. heist3 and heist4 peaked at 100 or 200 and finished nothing later.
+- Scores before heist5 were taken with the placeholder 60 s time limit; the event's is 40 s, which
+  changes no finish below it.
+
+### The reference
+
+heist5, checkpoint 300 (training commit `2efb9e1`: the recipe as shipped). Trained by:
+
+```bash
+uv run --no-config --no-sync train Mjlab-SockHeist6m-MicroDuck --env.scene.num-envs 4096 \
+    --agent.max-iterations 1000 --agent.seed 1 --agent.logger tensorboard --agent.run-name heist5 \
+    --hf-jobs --detach --no-wandb --namespace Nico-robot --ckpt-repo Nico-robot/mjlab-sockheist6m-microduck-heist5
+```
+
+(canceled after checkpoint 300, once it had passed the walker on the Mac and on x86). Exported by
+`publish --dry-run` and scored with `arena score publish-eval/policy.onnx --event sock-heist-6m`:
+
+| | Mac | x86 |
+|---|---|---|
+| Score | 16.983 s at 1.20 m/s, 5/5 (seeds 16.37, 18.80, 17.11, 16.11, 16.53) | 16.982 s at 1.20 m/s, 5/5 (seeds 16.41, 18.80, 17.105, 16.055, 16.54) |
+| The walker's | 24.210 s at 1.00 m/s | 24.159 s at 1.00 m/s |
+
+Its CHECK over 25 seeds at 1.20 m/s: `finished 25/25 · caught 0 (early 0) · fell 0 (on a stop 0, on a
+start 0) · out of time 0 (never left the line 0) · mean 17.17 s`; worst drift while watched 0.3 to
+0.8 cm, and 0.66 m/s on green: it walks at about half its command and stops dead on every red.
+
+Published by the release as `pollen-robotics/microduck-sock-heist-6m-reference`; fetch it with:
+
+```bash
+uv run hf download pollen-robotics/microduck-sock-heist-6m-reference policy.onnx --local-dir logs/reference/sock-heist-6m
+```

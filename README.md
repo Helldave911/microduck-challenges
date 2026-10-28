@@ -39,6 +39,12 @@ checkpoint and keep the best, not the last. Its `stay_upright` knob, off by defa
 Play two policies against each other (B defaults to the reference) with
 `uv run --frozen --group workshop python -m microduck_challenges.tug_of_war.check A.onnx [B.onnx] [--bouts 10]`.
 
+The Sock Heist is a race with a rule: 6 m to the socks of a giant microduck's nest, and freeze whenever the giant
+turns its head to the lanes, or be caught. The policy sees only its command, zero on red, and each seed's timetable is
+the same for every entrant. Say why each seed of a policy ended with
+`uv run --frozen --group workshop python -m microduck_challenges.sock_heist_6m.check policy.onnx [--speed V] [--seeds N]`.
+The recipe starts the learner as the reference walker.
+
 ## The workshop
 
 Each challenge's page on the Arena has a **Train my own robot** button with one line to copy:
