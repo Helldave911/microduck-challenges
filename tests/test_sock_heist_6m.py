@@ -11,8 +11,7 @@ from tensordict import TensorDict
 
 from arena import runner as arena_runner
 from arena.assets import ASSET_ROOT
-from arena.constants import ACTION_SCALE, CTRL_DT as ARENA_CTRL_DT, OBS_SIZE
-from arena.constants import TRACE_WIDTH
+from arena.constants import ACTION_SCALE, CTRL_DT as ARENA_CTRL_DT, OBS_SIZE, TRACE_WIDTH
 from arena.lights import Red, timetable
 from arena.manifest import load_event
 from arena.runner import RunOutcome
@@ -345,3 +344,22 @@ def test_check_judges_the_walker(capsys):
     assert check.main([str(walker.WALKER), "--speed", "0.95", "--seeds", "1"]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[0].startswith("seed 1 · ") and lines[-1].startswith("finished ")   # no verdict: platforms differ
+
+
+RED = (Red(50, 70),)   # watched from step 70, ends at step 120
+
+
+@pytest.mark.parametrize("caught_frame, kind", [(80, "caught early"), (81, "caught late")])
+def test_a_catch_is_early_up_to_ten_steps_into_the_watch(caught_frame, kind):
+    assert check.judge(_outcome("caught", np.zeros(140), caught_frame=caught_frame), RED, 20, 15)[0] == kind
+
+
+@pytest.mark.parametrize("tip, kind", [
+    (80, "fell on a stop"), (81, "fell under a red"), (150, "fell on a start"), (151, "fell on green")])
+def test_a_fall_is_on_a_stop_or_a_start_up_to_thirty_steps_after_it(tip, kind):
+    assert check.judge(_outcome("fall", np.zeros(tip + 15)), RED, 20, 15)[0] == kind   # tipping begins at k - 14
+
+
+@pytest.mark.parametrize("progress, kind", [(0.6, "out of time"), (0.4, "never left the line")])
+def test_out_of_time_is_never_left_the_line_below_half_a_metre(progress, kind):
+    assert check.judge(_outcome("timeout", np.full(500, progress)), RED, 20, 15)[0] == kind

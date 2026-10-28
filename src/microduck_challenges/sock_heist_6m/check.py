@@ -23,7 +23,7 @@ from arena.runner import RunOutcome, run_once
 
 EVENT = "sock-heist-6m"
 CAUGHT_EARLY_S = 0.2  # caught within this of the watch's start: still moving when the head finished turning
-STOP_WINDOW_S = 0.6  # a fall tipping within this of a red's start is on a stop, within this of its end on a start
+STOP_WINDOW_S = 0.6  # a fall tipping within this (inclusive) of a red's start is on a stop, of its end on a start
 LEFT_THE_LINE_M = 0.5  # a duck that ended nearer its line than this never left it
 
 
@@ -62,10 +62,10 @@ def judge(outcome: RunOutcome, reds: tuple[Red, ...], turn: int, fall_hold: int)
     if outcome.status == "fall":
         tip, window = k - fall_hold + 1, _steps(STOP_WINDOW_S)
         for r in reds:
-            if r.onset <= tip < r.onset + window:
+            if r.onset <= tip <= r.onset + window:
                 return "fell on a stop", f"fell at {t:.2f} s on a stop, tipping {(tip - r.onset) * CTRL_DT:.2f} s after a red began · {tail}"
             end = r.onset + r.length
-            if end <= tip < end + window:
+            if end <= tip <= end + window:
                 return "fell on a start", f"fell at {t:.2f} s on a start, tipping {(tip - end) * CTRL_DT:.2f} s after a red ended · {tail}"
         under = any(r.onset <= tip < r.onset + r.length for r in reds)
         where = "under a red" if under else "on green"
