@@ -331,7 +331,7 @@ What each run showed:
   speed along the nose whatever the heading, and the training floor has no walls, so veering was
   free. From checkpoint 200 on the policy ignored its yaw-rate command and veered right (off a 0.3 m
   half-lane on 83 % of timed steps in training): the Arena's wall caught or felled it within about a
-  second (heist3-999: 0/25 on the Arena, 0 caught and 0 fell in training). Weight 12 was worse than 8:
+  second (heist3-999 at 0.75 m/s over the same 25 timetables: 0/25 on the Arena, 20 caught and 4 fell, all touching the right wall; 0 caught and 0 fell in training). Weight 12 was worse than 8:
   both collapsed near iteration 300 (caught peaked near 5 per step) and recovered by 600 in the
   curves, but not on the Arena.
 - **heist5's `off_lane` termination worked.** It ends an episode whose trunk strays more than 0.3 m
@@ -340,9 +340,10 @@ What each run showed:
   / +0.80 rad/s at checkpoint 300) and the first three checkpoints all beat the walker.
 - **Checkpoints differ**; judge each. heist5: 100, 200 and 300 all finish 5/5 and pass CHECK 25/25
   (Mac 23.03 s at 1.20 m/s, 19.34 s at 0.95, 16.98 s at 1.20; 0.48, 0.58 and 0.66 m/s on green),
-  each faster than the last. heist3 and heist4 peaked at 100 or 200 and finished nothing later.
-- Scores before heist5 were taken with the placeholder 60 s time limit; the event's is 40 s, which
-  changes no finish below it.
+  each faster than the last. heist3 finished nothing after 200; heist4's best was 100, and later only 400 and 999 finished anything (1/5 and 4/5).
+- Scores before heist5 were taken with the placeholder 60 s time limit; the event's is 40 s, under which
+  the finishes slower than 40 s no longer count: heist2-100 (57.80 s), and heist4-100, 400 and 999
+  (45.69 s, 54.46 s, 45.98 s). heist3's and heist5's are unchanged.
 
 ### The reference
 
