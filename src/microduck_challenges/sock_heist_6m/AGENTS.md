@@ -273,3 +273,11 @@ shared by every seed, a 150 s limit):
 - **It finished from 0.45 to 1.00 m/s**, in 131 s down to 63 s; at 1.05 m/s it fell about a metre
   out, and **from 1.10 m/s it was caught in the first red**, still coasting some 0.35 m out: a walk
   that fast cannot stop in the turn.
+
+From the reference walker on this 6 m lane, measured on a Mac (indicative: the Arena's x86 physics
+decides):
+
+- **It finishes at up to 1.00 m/s**: the sweep's best command is 1.00 m/s, scored 24.21 s, all five
+  seeds finished between 22.6 s and 25.1 s; from 1.05 m/s it falls about a metre out.
+- **Replayed at 1.00 m/s over 25 seeds, it finishes 24 and is caught once** (seed 23, 0.46 s into
+  the watch of its first red), with a mean finish of 25.45 s. Its worst drift from the lane is 3.0 cm.
