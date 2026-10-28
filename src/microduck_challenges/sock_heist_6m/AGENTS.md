@@ -69,8 +69,7 @@ walks on its command is all the challenge asks.
   standing is never made cheaper than walking. The critic alone is told the light (standing,
   watched, seconds to the next change, the drift over 3 cm) and the lane (offset, heading).
 - **No pushes**: a push while watched catches a duck that did nothing, and the Arena pushes nobody.
-- **No walls in training**: the hold keeps the duck on the lane (it kept the walker within 0.30 m of
-  the centre line at 1.0 m/s on a 15 m lane).
+- **No walls in training**: the hold keeps the duck on the lane.
 - **No `heading_hold`, no standing episodes**: the hold commands the yaw rate, and the reds stand
   about 45 % of every episode.
 - **1000 iterations, a checkpoint every 100**: warm-started Tug of War runs peaked early and fell
@@ -265,19 +264,12 @@ fork, never `pollen-robotics`; the workshop's home sets that up).
 
 ## What is known about this challenge
 
-From the reference walker on the contributor's first version of the race (15 m, one timetable
-shared by every seed, a 150 s limit):
-
-- **It was never trained to stop and start again**, and does now and then fall doing it.
-- **It does not move at 0.20 m/s**: commanded that slowly, it stands.
-- **It finished from 0.45 to 1.00 m/s**, in 131 s down to 63 s; at 1.05 m/s it fell about a metre
-  out, and **from 1.10 m/s it was caught in the first red**, still coasting some 0.35 m out: a walk
-  that fast cannot stop in the turn.
-
 From the reference walker on this 6 m lane, measured on a Mac (indicative: the Arena's x86 physics
 decides):
 
-- **It finishes at up to 1.00 m/s**: the sweep's best command is 1.00 m/s, scored 24.21 s, all five
-  seeds finished between 22.6 s and 25.1 s; from 1.05 m/s it falls about a metre out.
-- **Replayed at 1.00 m/s over 25 seeds, it finishes 24 and is caught once** (seed 23, 0.46 s into
-  the watch of its first red), with a mean finish of 25.45 s. Its worst drift from the lane is 3.0 cm.
+- **It was never trained to stop and start again.**
+- **The sweep**: it finishes from 0.40 to 1.00 m/s (24.21 s at 1.00 m/s, its scored command, 5/5
+  seeds between 22.6 s and 25.1 s); from 1.05 m/s it falls or is caught.
+- **Replayed at 1.00 m/s over 25 seeds, it finishes 24** with a mean finish of 24.01 s (21.42 s to
+  26.57 s), **and is caught once** (seed 23, 0.46 s into the watch, at 1.56 s). None fell and none
+  stayed at the start; the worst drift while watched is 3.0 cm (2.7 cm among the finishers).
