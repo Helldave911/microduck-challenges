@@ -79,10 +79,10 @@ walks on its command is all the challenge asks.
 
 | File | What it holds | Change it? |
 |---|---|---|
-| `challenge.toml` `[params]` | The four knobs below | Yes, first. Keep each value within its `min`/`max` (the workshop refuses others) |
+| `challenge.toml` `[params]` | The five knobs below | Yes, first. Keep each value within its `min`/`max` (the workshop refuses others) |
 | `challenge.toml` `[recipe]` | `num_envs` 4096, `max_iterations` 1000, `seed` 1 | Yes, when agreed with the user |
 | `env.py` | The whole environment: rewards, commands, domain randomization, curricula, terrain, `RL_CFG` (network, PPO, checkpoints every 100 iterations) | Yes, once the knobs are not enough |
-| `rewards.py` | `freeze`, `caught`, and the critic's `light_state` and `lane_state` | Yes, to add a reward term (then add it to `cfg.rewards` in `env.py`) |
+| `rewards.py` | `freeze`, `progress`, `caught`, and the critic's `light_state` and `lane_state` | Yes, to add a reward term (then add it to `cfg.rewards` in `env.py`) |
 | `lights.py` | The event's numbers and the Arena's arithmetic, and `LightsCommand`, the twist | Only the command term; never the copies |
 | `walker.py`, `walker.onnx` | The learner's start | No |
 | `tasks.py`, `event`/`task`/`kind` in `challenge.toml` | Registration with mjlab and the Arena | No |
@@ -90,6 +90,7 @@ walks on its command is all the challenge asks.
 | Knob | Label | Default | Range | Sets in `env.py` |
 |---|---|---|---|---|
 | `forward_reward` | Walk on green | 2.0 | 0.5–5.0 | `track_linear_velocity` weight |
+| `progress_reward` | Walk forward | 8.0 | 0.0–16.0 | `progress` weight |
 | `freeze_reward` | Freeze while watched | 2.0 | 0.0–6.0 | `freeze` weight |
 | `upright_reward` | Stay upright | 2.0 | 0.5–5.0 | `upright` weight |
 | `step_reward` | Lift your feet | 3.0 | 0.0–6.0 | `air_time` weight |
@@ -100,9 +101,10 @@ The reward terms as they start:
 |---|---|---|
 | `track_linear_velocity` | `forward_reward` 2.0, std √0.1 | Progress on green at the commanded speed, and stillness on red (a zero command). At 0.45 m/s standing earns 13 % of walking; the Tug of War's t4/t5 never walked at 41 %. |
 | `track_angular_velocity` | 2.0, std √0.5 | The lane's hold steers through the yaw rate, so tracking it is the steering. |
+| `progress` | `progress_reward` 8.0 | Forward speed up to the command, nothing on red. Without it a statue out-earned the walker under the lights (8.92 a step against 7.91): the walker reaches only ~0.45 of its command, which `track_linear_velocity` barely pays over standing, and heist1 and heist2 learned to creep. |
 | `freeze` | `freeze_reward` 2.0, std 0.03 m | The rule is 3 cm, and nothing else sees a few centimetres of creep: tracking's std is 0.32 m/s. |
 | `upright` | `upright_reward` 2.0, std √0.05 | The sprint's. A forward lean is what ends in a fall on a stop. |
-| `air_time` | `step_reward` 3.0, threshold 0.01 | The sprint's. It pays steps only on a non-zero command, so stepping in place under a red earns nothing. |
+| `air_time` | `step_reward` 3.0, threshold 0.01 | The sprint's. It pays steps only on a non-zero command, so stepping in place under a red earns nothing (on green it pays stepping in place too; `progress` pays walking over it). |
 | `pose` | 1.0 | The sprint's: on a zero command its standing std pulls the legs to the standing pose. |
 | gait and smoothness terms | the sprint's | Unchanged shaping of the walk the walker already has. |
 | `caught` (termination) | none | It costs every reward still to come (γ 0.99), as a fall does. |

@@ -97,14 +97,29 @@ def live():
 
 
 @pytest.fixture(scope="module")
+def flock():
+    """The training env with 8 ducks, seeded: how far the walker gets on green varies by duck (0.17 m/s for
+    two of them, 0.30 for eight), so a margin between walking and standing wants more than two."""
+    cfg = env.make_env_cfg()
+    cfg.scene.num_envs = 8
+    cfg.seed = SEED
+    training = ManagerBasedRlEnv(cfg, device="cpu")
+    yield training
+    training.close()
+
+
+@pytest.fixture(scope="module")
 def walker_step():
     """One step of `live` with the Arena's walker driving both ducks: on zero actions a duck tips over within
     about a second (fell_over at steps 48 and 59), where the walker asked to stand holds within a millimetre."""
     session = onnxruntime.InferenceSession(str(walker.WALKER), providers=["CPUExecutionProvider"])
 
-    def step(live):
-        rows = live.obs_buf["actor"].numpy()
-        live.step(torch.from_numpy(np.concatenate([session.run(None, {"obs": r[None]})[0] for r in rows])))
+    def step(live, stand=False):
+        """`stand`: the walker is told no speed (its observed twist, obs[48:51], zeroed), so it stands."""
+        rows = live.obs_buf["actor"].numpy().copy()
+        if stand:
+            rows[:, 48:51] = 0.0
+        return live.step(torch.from_numpy(np.concatenate([session.run(None, {"obs": r[None]})[0] for r in rows])))
 
     return step
 
@@ -182,6 +197,24 @@ def test_walking_on_green_pays_far_more_than_standing_still(cfg):
     assert "heading_hold" not in cfg.rewards
     paid = lambda vx: term.weight * term.func(_tracking_env(0.45, vx), **term.params).item()
     assert paid(0.45) == pytest.approx(2.0) and paid(0.0) <= 2.0 / 6
+
+
+@pytest.mark.parametrize("speed", [0.8, 1.0])
+def test_walking_on_green_out_earns_standing_still(flock, walker_step, speed):
+    # Under an endless green a statue once earned 6.9 a step to the walker's 6.0-6.5 (heist1 and heist2 crept):
+    # walking must win by more than the 1.6 air_time pays a duck stepping in place.
+    paid = {}
+    for stand in (False, True):
+        _set_reds(flock, onset=10**6, length=1)
+        flock.command_manager.get_term("twist").speed[:] = speed
+        total = []
+        for k in range(300):
+            reward = walker_step(flock, stand)[1]
+            if k >= 100:
+                total.append(reward.mean().item() / flock.step_dt)
+        paid[stand] = sum(total) / len(total)
+    print(f"speed {speed}: walking {paid[False]:.2f}, standing {paid[True]:.2f}, margin {paid[False] - paid[True]:.2f}")
+    assert paid[False] - paid[True] > 1.6
 
 
 def test_freeze_pays_only_while_watched_and_fades_at_the_tolerance(cfg):

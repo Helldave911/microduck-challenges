@@ -1,4 +1,4 @@
-"""Sock Heist's own terms: freezing while the giant watches, being caught, and what the critic alone is
+"""Sock Heist's own terms: freezing while the giant watches, walking on green, being caught, and what the critic alone is
 told of the light and the lane. Each reads the LightsCommand (lights.py) named `command_name`."""
 
 import torch
@@ -12,6 +12,12 @@ def freeze(env, command_name: str, std: float) -> torch.Tensor:
     term = env.command_manager.get_term(command_name)
     _, _, watch = term.stepped()
     return torch.where(watch, torch.exp(-((term.drift() / std) ** 2)), 0.0)
+
+
+def progress(env, command_name: str) -> torch.Tensor:
+    """Forward speed, up to the command: pays walking on green and nothing on red (the command is zero)."""
+    vx = env.scene["robot"].data.root_link_lin_vel_b[:, 0].clamp(min=0.0)
+    return torch.minimum(vx, env.command_manager.get_command(command_name)[:, 0])
 
 
 def caught(env, command_name: str) -> torch.Tensor:

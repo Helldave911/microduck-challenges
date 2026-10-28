@@ -1,7 +1,7 @@
 """The 6 m Sock Heist's training environment: the sprint's walk, under the giant's eye.
 
 A copy of the 2 m Sprint's environment (sprint_2m/env.py), made the Sock
-Heist's own: the four rewards a novice tunes read from challenge.toml
+Heist's own: the five rewards a novice tunes read from challenge.toml
 ([params]), and the event's rules played on the policy's command. Everything
 here is yours to change; the robot (MICRODUCK_WALK_ROBOT_CFG) and the reward
 functions (microduck_mdp) come from mjlab_microduck and are not edited here.
@@ -278,8 +278,8 @@ def make_env_cfg(
 
 
     # air_time window [0.125, 0.300] s. It pays steps only on a non-zero
-    # command, so stepping in place under a red earns nothing; standing still
-    # is taught by the reds and freeze.
+    # command: stepping in place under a red earns nothing, but on green it
+    # pays it too (progress below is what pays walking over stepping).
     cfg.rewards["air_time"].weight = knobs["step_reward"]
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.125
@@ -304,6 +304,14 @@ def make_env_cfg(
         func=rewards.freeze,
         weight=knobs["freeze_reward"],
         params={"command_name": "twist", "std": lights.TOLERANCE_M},
+    )
+
+    # Forward speed up to the command. Measured under the lights, a statue earned
+    # 8.92 a step, the warm-start walker 7.91 and one that walks on green and
+    # freezes on red 8.29: the walker reaches ~0.45 of its command, which
+    # track_linear_velocity barely pays over a statue.
+    cfg.rewards["progress"] = RewardTermCfg(
+        func=rewards.progress, weight=knobs["progress_reward"], params={"command_name": "twist"}
     )
 
     # Action smoothness: stage-0 value; the action_rate_weight curriculum below

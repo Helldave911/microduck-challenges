@@ -50,6 +50,7 @@ CHALLENGES = {
     },
     "sock_heist_6m": {
         "forward_reward": ("track_linear_velocity", 3.7),
+        "progress_reward": ("progress", 5.3),
         "freeze_reward": ("freeze", 1.3),
         "upright_reward": ("upright", 1.3),
         "step_reward": ("air_time", 4.1),
