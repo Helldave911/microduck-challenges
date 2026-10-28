@@ -19,6 +19,8 @@ TOLERANCE_M = 0.03             # [lights] tolerance_m
 LOOKAHEAD_M = 0.5              # [steering] lookahead_m
 GAIN = 2.0                     # [steering] gain
 MAX_YAW_RATE = 1.0             # [steering] max_yaw_rate
+# The Arena's [course] width_m halved, less 0.1 m: the trunk's |y| at its first wall contact measured 0.28-0.37 m.
+LANE_HALF_WIDTH_M = 0.3
 
 
 def steps(seconds: float) -> int:

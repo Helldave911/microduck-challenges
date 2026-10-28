@@ -362,6 +362,14 @@ def make_env_cfg(
         time_out=False,
         params={"command_name": "twist"},
     )
+    # Off the lane: the Arena's walls end such a run, and the training floor has none. heist3 ignored its
+    # turn command and veered right (off a 0.3 m half-lane on 83 % of timed steps) while `progress` paid
+    # its body-axis speed all the same; on the Arena it hit the wall within ~1 s (0/25 finished).
+    cfg.terminations["off_lane"] = TerminationTermCfg(
+        func=rewards.off_lane,
+        time_out=False,
+        params={"command_name": "twist", "half_width": lights.LANE_HALF_WIDTH_M},
+    )
 
     cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.13)
     # The event's [start.perturbation]: the heading within ±2° of the lane, along +x.
@@ -738,7 +746,8 @@ def make_env_cfg(
         params={"command_name": "head_pose", "tau_s": 1.0},
     )
 
-    # Terrain: the lane is flat, with no walls: the hold keeps the duck on it.
+    # Terrain: the lane is flat, with no walls. The hold keeps the duck on it only while the policy follows
+    # the turn command; the off_lane termination ends the episode of one that does not.
     cfg.scene.terrain.terrain_type = "plane"
     cfg.scene.terrain.terrain_generator = None
 

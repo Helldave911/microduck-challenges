@@ -69,7 +69,10 @@ walks on its command is all the challenge asks.
   standing is never made cheaper than walking. The critic alone is told the light (standing,
   watched, seconds to the next change, the drift over 3 cm) and the lane (offset, heading).
 - **No pushes**: a push while watched catches a duck that did nothing, and the Arena pushes nobody.
-- **No walls in training**: the hold keeps the duck on the lane.
+- **No walls in training**: the hold keeps the duck on the lane, and `off_lane` ends the episode of one
+  that strays more than 0.3 m from it. heist3 learned to ignore its yaw-rate command, so the hold could
+  not keep it straight and it veered right: off the lane on 83 % of timed steps in training, caught or
+  fallen against the wall within ~1 s on the Arena (0/25), while `progress` paid it all the same.
 - **No `heading_hold`, no standing episodes**: the hold commands the yaw rate, and the reds stand
   about 45 % of every episode.
 - **1000 iterations, a checkpoint every 100**: warm-started Tug of War runs peaked early and fell
@@ -90,7 +93,7 @@ walks on its command is all the challenge asks.
 | Knob | Label | Default | Range | Sets in `env.py` |
 |---|---|---|---|---|
 | `forward_reward` | Walk on green | 2.0 | 0.5–5.0 | `track_linear_velocity` weight |
-| `progress_reward` | Walk forward | 12.0 | 0.0–16.0 | `progress` weight |
+| `progress_reward` | Walk forward | 8.0 | 0.0–16.0 | `progress` weight |
 | `freeze_reward` | Freeze while watched | 2.0 | 0.0–6.0 | `freeze` weight |
 | `upright_reward` | Stay upright | 2.0 | 0.5–5.0 | `upright` weight |
 | `step_reward` | Lift your feet | 3.0 | 0.0–6.0 | `air_time` weight |
@@ -101,13 +104,14 @@ The reward terms as they start:
 |---|---|---|
 | `track_linear_velocity` | `forward_reward` 2.0, std √0.1 | Progress on green at the commanded speed, and stillness on red (a zero command). At 0.45 m/s standing earns 13 % of walking; the Tug of War's t4/t5 never walked at 41 %. |
 | `track_angular_velocity` | 2.0, std √0.5 | The lane's hold steers through the yaw rate, so tracking it is the steering. |
-| `progress` | `progress_reward` 12.0 | Forward speed up to the command, nothing on red. Without it a statue out-earned the walker under the lights (8.92 a step against 7.91): the walker reaches only ~0.45 of its command, which `track_linear_velocity` barely pays over standing, and heist1 and heist2 learned to creep. |
+| `progress` | `progress_reward` 8.0 | Forward speed up to the command, nothing on red. Without it a statue out-earned the walker under the lights (8.92 a step against 7.91): the walker reaches only ~0.45 of its command, which `track_linear_velocity` barely pays over standing, and heist1 and heist2 learned to creep. |
 | `freeze` | `freeze_reward` 2.0, std 0.03 m | The rule is 3 cm, and nothing else sees a few centimetres of creep: tracking's std is 0.32 m/s. |
 | `upright` | `upright_reward` 2.0, std √0.05 | The sprint's. A forward lean is what ends in a fall on a stop. |
 | `air_time` | `step_reward` 3.0, threshold 0.01 | The sprint's. It pays steps only on a non-zero command, so stepping in place under a red earns nothing (on green it pays stepping in place too; `progress` pays walking over it). |
 | `pose` | 1.0 | The sprint's: on a zero command its standing std pulls the legs to the standing pose. |
 | gait and smoothness terms | the sprint's | Unchanged shaping of the walk the walker already has. |
 | `caught` (termination) | none | It costs every reward still to come (γ 0.99), as a fall does. |
+| `off_lane` (termination) | none | The trunk more than 0.3 m off its lane (the Arena's half-width less 0.1 m) ends the episode, as the Arena's wall would. |
 
 Do not change, or the Arena cannot race the policy or the tests fail:
 

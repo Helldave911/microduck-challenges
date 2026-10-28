@@ -62,6 +62,10 @@ def test_the_light_steps_are_the_arenas(turn):
             expected.red.tolist(), expected.mark.tolist(), expected.watch.tolist())
 
 
+def test_the_lane_is_the_arenas_less_a_duck_width():
+    assert lights.LANE_HALF_WIDTH_M == pytest.approx(EVENT.course.width_m / 2 - 0.1)
+
+
 def test_the_hold_is_the_arenas():
     command = np.asarray(EVENT.command, dtype=np.float64)
     for y in (-0.35, -0.05, 0.0, 0.12, 0.35):
@@ -274,6 +278,14 @@ def test_a_duck_entering_mid_watch_is_judged_from_where_it_entered(live):
     assert term.ahead()[1].all()                         # the step about to run is watched
     live.step(torch.zeros(2, 14))
     assert live.termination_manager.get_term("caught").tolist() == [False, False]
+
+
+def test_straying_more_than_the_half_lane_off_the_lane_ends_the_episode(live):
+    _set_reds(live, onset=10**6, length=1)
+    _nudge(live, env_id=0, dy=0.31)
+    _nudge(live, env_id=1, dy=0.29)
+    live.step(torch.zeros(2, 14))
+    assert live.termination_manager.get_term("off_lane").tolist() == [True, False]
 
 
 def test_the_critic_is_told_the_light_and_the_lane(live, walker_step):

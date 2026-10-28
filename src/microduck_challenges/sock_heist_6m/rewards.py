@@ -27,6 +27,14 @@ def caught(env, command_name: str) -> torch.Tensor:
     return watch & (term.drift() > lights.TOLERANCE_M)
 
 
+def off_lane(env, command_name: str, half_width: float) -> torch.Tensor:
+    """(n,) bool: the trunk more than `half_width` off its lane. The training floor has no walls, so this
+    stands for them: heist3 learned to ignore its turn command and veered, which the Arena's wall ends
+    within a second, caught or fallen, where nothing in training did."""
+    term = env.command_manager.get_term(command_name)
+    return (term.trunk[:, 1] - term.lane_y).abs() > half_width
+
+
 def light_state(env, command_name: str) -> torch.Tensor:
     """(n, 4), for the step about to run: standing (the settle or a red), watched, the seconds until the
     twist next changes (the settle ends, a red starts or ends), and the drift over TOLERANCE_M once
