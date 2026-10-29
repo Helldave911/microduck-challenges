@@ -41,7 +41,8 @@ backwards. The rules, from `arena/events/tug-of-war.toml` in the installed Arena
   seeds. A bout scores the centimetres of ground the marker ends from the centre line towards the
   entry, plus **100 cm** when only the opponent is in the pit (minus 100 when only the entry is). The
   rating is the mean of the five, **in centimetres, higher wins**. A fault scores **-200 cm**, and in
-  a rating a MuJoCo reset is the entry's fault too (the reference never causes one). `arena score`
+  a rating a MuJoCo reset is the entry's fault too (the reference never causes one), as is a string
+  end torn more than 5 cm off its neck: a physics explosion MuJoCo has not caught yet. `arena score`
   prints the rating, a faulted bout as `fault`. Against
   it, the ducks that pull bowed onto their heads rate about +135 cm, the recipe as shipped +138.1 cm
   after 250 iterations, and the reference itself +3.7 cm ("What is known").
