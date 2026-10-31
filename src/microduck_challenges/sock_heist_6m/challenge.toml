@@ -21,24 +21,24 @@ max   = 5.0
 
 [params.progress_reward]
 label = "Walk forward"
-value = 14.4810126582278
+value = 16.0
 min   = 0.0
 max   = 16.0
 
 [params.freeze_reward]
 label = "Freeze while watched"
-value = 0.170886075949367
+value = 0.113924050632911
 min   = 0.0
 max   = 6.0
 
 [params.upright_reward]
 label = "Stay upright"
-value = 3.80379746835443
+value = 2.49367088607595
 min   = 0.5
 max   = 5.0
 
 [params.step_reward]
 label = "Lift your feet"
-value = 3.0
+value = 3.5126582278481
 min   = 0.0
 max   = 6.0
